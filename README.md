@@ -1,4 +1,4 @@
-# Agricultural Recommendation Engine
+# AgroAssist - Agricultural Recommendation Engine
 
 AI-powered agricultural decision-support application for an agricultural pharmacy.
 
