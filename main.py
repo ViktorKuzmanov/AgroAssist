@@ -55,7 +55,7 @@ TEMPLATES = {
     ),
 }
 
-
+# spoj gi site docs t.e. rezultati od retriever=ot i spoj gi so prazen red. Ova kje bide context-ot
 def format_docs(docs):
     return "\n\n".join(d.page_content for d in docs)
 
