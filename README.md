@@ -273,8 +273,40 @@ cd agricultural-recommendation-engine
 ### 2. Install Backend Dependencies
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+### 3. Configure the OpenAI API Key
+
+```bash
+cp .env.example .env
+# отвори .env и внеси го твојот OPENAI_API_KEY
+```
+
+> ⚠️ Клучот никогаш не се commit-ува. `.env` е во `.gitignore`.
+
+### 4. Run the Chatbot Backend
+
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+Тест:
+
+```bash
+curl http://localhost:8000/health
+
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Кога да прскам лозје против пламеница?"}],"lang":"mk"}'
+```
+
+Endpoint-и:
+
+- `GET /health` — проверка дека серверот работи.
+- `POST /chat` — прима `{ "messages": [{ "role": "user" | "assistant", "content": "..." }], "lang": "mk" | "en" }` и враќа `{ "reply": "..." }`.
 
 
 
