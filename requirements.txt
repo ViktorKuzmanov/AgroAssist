@@ -2,3 +2,10 @@ fastapi>=0.115
 uvicorn[standard]>=0.30
 openai>=1.40
 python-dotenv>=1.0
+
+# RAG
+langchain
+langchain-openai
+langchain-community
+langchain-chroma
+langchain-text-splitters

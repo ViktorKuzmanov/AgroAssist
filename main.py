@@ -1,8 +1,8 @@
 """
-AgroAssist — минимален FastAPI бекенд поврзан со OpenAI.
+AgroAssist — минимален FastAPI бекенд со едноставен RAG.
 
-Засега: едноставен chatbot endpoint (/chat) што ги праќа пораките до OpenAI.
-Подоцна: RAG, embeddings, база на производи, правила итн.
+Го вчитува knowledgeBase.txt, го дели на chunks, прави embeddings и
+одговара на прашања користејќи ги најрелевантните делови.
 """
 
 import os
@@ -11,39 +11,53 @@ from typing import Literal
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI, OpenAIError
 from pydantic import BaseModel
+
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import TextLoader
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_text_splitters import CharacterTextSplitter
 
 load_dotenv()
 
-# --- Конфигурација ----------------------------------------------------------
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 
-if not OPENAI_API_KEY:
-    raise RuntimeError(
-        "OPENAI_API_KEY не е поставен. Копирај .env.example во .env и внеси го клучот."
-    )
+# --- RAG: вчитај knowledge base и направи векторска база ---------------------
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+loader = TextLoader("./knowledgeBase.txt", encoding="utf-8")
+documents = loader.load()
 
-SYSTEM_PROMPTS = {
+text_splitter = CharacterTextSplitter(
+    separator="\n\n",
+    chunk_size=1200,
+    chunk_overlap=200,
+)
+chunks = text_splitter.split_documents(documents)
+
+vector_db = Chroma.from_documents(chunks, OpenAIEmbeddings())
+retriever = vector_db.as_retriever(search_kwargs={"k": 4})
+
+model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
+
+TEMPLATES = {
     "mk": (
-        "Ти си AI асистент на Викторија Кристал, аграрна аптека. "
-        "Одговарај кратко, јасно и корисно на прашања за прскање, ѓубрење, "
-        "заштита на култури, болести и штетници. Ако не си сигурен, кажи дека "
-        "не си сигурен и предложи да се консултира стручен агроном. "
-        "Одговарај на македонски јазик."
+        "Ти си AI асистент на Викторија Кристал, аграрна аптека. Одговори кратко "
+        "на прашањето користејќи го само следниот контекст:\n\n{context}\n\n"
+        "Прашање: {question}"
     ),
     "en": (
         "You are the AI assistant of Viktoria Kristal, an agricultural pharmacy. "
-        "Answer briefly, clearly and helpfully about spraying, fertilizing, crop "
-        "protection, diseases and pests. If you are unsure, say so and suggest "
-        "consulting a professional agronomist. Answer in English."
+        "Answer briefly using only the following context:\n\n{context}\n\n"
+        "Question: {question}"
     ),
 }
+
+
+def format_docs(docs):
+    return "\n\n".join(d.page_content for d in docs)
 
 
 # --- Модели -----------------------------------------------------------------
@@ -82,24 +96,20 @@ def health() -> dict:
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
-    """Прима историја на разговорот и враќа одговор од OpenAI."""
+    """Најди релевантни делови од knowledge base-от и одговори."""
     if not req.messages:
         raise HTTPException(status_code=400, detail="Нема пораки.")
 
-    system = SYSTEM_PROMPTS.get(req.lang, SYSTEM_PROMPTS["en"])
+    question = next(
+        (m.content for m in reversed(req.messages) if m.role == "user"), ""
+    )
 
-    # Ограничи ја историјата за да не расте неограничено.
-    history = [m.model_dump() for m in req.messages[-20:]]
+    context = format_docs(retriever.invoke(question))
 
-    try:
-        completion = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[{"role": "system", "content": system}, *history],
-        )
-    except OpenAIError as exc:
-        raise HTTPException(
-            status_code=502, detail=f"Грешка од OpenAI: {exc}"
-        ) from exc
+    prompt = ChatPromptTemplate.from_template(
+        TEMPLATES.get(req.lang, TEMPLATES["en"])
+    )
+    chain = prompt | model | StrOutputParser()
 
-    reply = completion.choices[0].message.content or ""
+    reply = chain.invoke({"context": context, "question": question})
     return ChatResponse(reply=reply)
