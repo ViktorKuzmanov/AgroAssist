@@ -40,9 +40,10 @@ chunks = text_splitter.split_documents(documents)
 vector_db = Chroma.from_documents(chunks, OpenAIEmbeddings())
 retriever = vector_db.as_retriever(search_kwargs={"k": 4})
 
-# TODO: add system prompt
+
 model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
 
+# Add system prompt
 TEMPLATES = {
     "mk": (
         "Ти си AI асистент на Викторија Кристал, земјоделска аптека. Одговори кратко "
