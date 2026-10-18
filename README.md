@@ -10,6 +10,63 @@ The application acts as a recommendation engine that helps answer questions such
 
 The system evaluates the customer's specific situation and identifies relevant products from the pharmacy's own product database.
 
+
+## Installation
+
+
+### 1. Clone/Download the Repository
+
+```bash
+git clone <repository-url>
+cd agricultural-recommendation-engine
+```
+
+### 2. Install Backend Dependencies
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Configure the OpenAI API Key
+
+```bash
+cp .env.example .env
+# отвори .env и внеси го твојот OPENAI_API_KEY
+```
+
+> ⚠️ Клучот никогаш не се commit-ува. `.env` е во `.gitignore`.
+
+### 4. Run the Chatbot Backend
+
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+Тест:
+
+```bash
+curl http://localhost:8000/health
+
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Кога да прскам лозје против пламеница?"}],"lang":"mk"}'
+```
+
+Endpoint-и:
+
+- `GET /health` — проверка дека серверот работи.
+- `POST /chat` — прима `{ "messages": [{ "role": "user" | "assistant", "content": "..." }], "lang": "mk" | "en" }` и враќа `{ "reply": "..." }`.
+- `GET /products/search?q=<барање>` — read-only пребарување во базата на производи (за тестирање).
+
+
+## Поврзување со базата на производи (PostgreSQL/Neon)
+
+Чатботот **само чита** од табелата `"Product"`. Ако во `.env` има `DATABASE_URL`, тој прво проверува дали го имаме производот и му ги дава достапните податоци (цена, категорија, активна супстанца, производител, залиха, рок, препорачана доза, каренца). Ако производот не се најде во базата, се користи постојната RAG логика (knowledgeBase.txt).
+
+Конекцијата е read-only: `set_session(readonly=True)`, се користат само `SELECT` и нема промени во базата. Спојката се наоѓа во `db.py`. `DATABASE_URL` веќе е внесен во `AgroAssist/.env` (gitignored).
+
 ## How It Works
 
 A pharmacy employee can enter information such as:
@@ -256,57 +313,6 @@ Those values should come from the application's trusted data sources.
 - **Git / GitHub** — Version control and development workflow
 
 
-
-## Installation
-
-
-
-### 1. Clone/Download the Repository
-
-```bash
-git clone <repository-url>
-cd agricultural-recommendation-engine
-```
-
-
-
-### 2. Install Backend Dependencies
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. Configure the OpenAI API Key
-
-```bash
-cp .env.example .env
-# отвори .env и внеси го твојот OPENAI_API_KEY
-```
-
-> ⚠️ Клучот никогаш не се commit-ува. `.env` е во `.gitignore`.
-
-### 4. Run the Chatbot Backend
-
-```bash
-uvicorn main:app --reload --port 8000
-```
-
-Тест:
-
-```bash
-curl http://localhost:8000/health
-
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"Кога да прскам лозје против пламеница?"}],"lang":"mk"}'
-```
-
-Endpoint-и:
-
-- `GET /health` — проверка дека серверот работи.
-- `POST /chat` — прима `{ "messages": [{ "role": "user" | "assistant", "content": "..." }], "lang": "mk" | "en" }` и враќа `{ "reply": "..." }`.
 
 
 

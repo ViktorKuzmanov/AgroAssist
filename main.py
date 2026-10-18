@@ -1,15 +1,17 @@
 """
-AgroAssist — минимален FastAPI бекенд со едноставен RAG.
+AgroAssist — FastAPI бекенд со RAG + read-only пристап до базата на производи.
 
-Го вчитува knowledgeBase.txt, го дели на chunks, прави embeddings и
-одговара на прашања користејќи ги најрелевантните делови.
+За секое прашање:
+1. Пребарува во базата ("Product") дали го имаме производот (read-only).
+2. Го вчитува релевантното земјоделско знаење од knowledgeBase.txt (RAG).
+3. Ги спојува двете во еден одговор.
 """
 
 import os
 from typing import Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -17,12 +19,16 @@ from langchain_chroma import Chroma
 from langchain_community.document_loaders import TextLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import CharacterTextSplitter
+
+from db import db_available, format_products, search_products
 
 load_dotenv()
 
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+# OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 
 # --- RAG: вчитај knowledge base и направи векторска база ---------------------
@@ -37,23 +43,51 @@ text_splitter = CharacterTextSplitter(
 )
 chunks = text_splitter.split_documents(documents)
 
+# TODO treba da se kesira chroma db , da ne se kreira sekoj pat odnovo
+# TODO treba da se smene embeding modelot da ne go plakjam via model, sakam besplaten
 vector_db = Chroma.from_documents(chunks, OpenAIEmbeddings())
 retriever = vector_db.as_retriever(search_kwargs={"k": 4})
 
-
-model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
+# model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
+model = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
 
 # Add system prompt
 TEMPLATES = {
     "mk": (
-        "Ти си AI асистент на Викторија Кристал, земјоделска аптека. Одговори кратко "
-        "на прашањето користејќи го само следниот контекст:\n\n{context}\n\n"
-        "Прашање: {question}"
+        "Ти си AI асистент на Викторија Кристал, земјоделска аптека. "
+        "Одговарај кратко, јасно и на македонски јазик.\n\n"
+        "ПРОИЗВОДИ НАЈДЕНИ ВО НАШАТА БАЗА (овие производи ПОСТОЈАТ и се достапни):\n"
+        "{products}\n\n"
+        "ЗЕМЈОДЕЛСКО ЗНАЕЊЕ:\n{context}\n\n"
+        "Прашање: {question}\n\n"
+        "Правила:\n"
+        "- Секој производ наведен во списокот ПОСТОИ во нашата база. Никогаш не "
+        "кажувај дека не го најдовме ако името е во списокот.\n"
+        "- Ако прашањето е за производ од списокот, кажи дека го имаме и наведи ги "
+        "достапните податоци (цена, категорија, активна супстанца, производител, "
+        "залиха, рок, препорачана доза, каренца).\n"
+        "- Ако некој податок недостасува, кажи дека не е наведен. Не измислувај "
+        "цени, залиха или состојки.\n"
+        "- Само ако списокот е празен (NONE), кажи дека моментално не го најдовме "
+        "производот и искористи го земјоделското знаење за да помогнеш."
     ),
     "en": (
         "You are the AI assistant of Viktoria Kristal, an agricultural pharmacy. "
-        "Answer briefly using only the following context:\n\n{context}\n\n"
-        "Question: {question}"
+        "Answer briefly, clearly, and in English.\n\n"
+        "PRODUCTS FOUND IN OUR DATABASE (these products EXIST and are available):\n"
+        "{products}\n\n"
+        "AGRICULTURAL KNOWLEDGE:\n{context}\n\n"
+        "Question: {question}\n\n"
+        "Rules:\n"
+        "- Every product listed above EXISTS in our database. Never say it was not "
+        "found if its name is in the list.\n"
+        "- If the question is about a listed product, say we have it and give the "
+        "available details (price, category, active substance, manufacturer, stock, "
+        "deadline, default dosage, karenca).\n"
+        "- If a detail is missing, say it is not listed. Never invent prices, stock, "
+        "or ingredients.\n"
+        "- Only if the list is empty (NONE), say we did not find the product and use "
+        "the agricultural knowledge to help."
     ),
 }
 
@@ -93,12 +127,24 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict:
     """Едноставна проверка дека серверот работи."""
-    return {"status": "ok", "model": OPENAI_MODEL}
+    return {"status": "ok", "model": GEMINI_MODEL, "database": db_available()}
+
+# TODO: Ne se koriste nigde vaa func moze da se isbrise pokasno samo za testiranje e 
+@app.get("/products/search")
+def products_search(
+    q: str = Query(..., min_length=1, description="Барање (име, супстанца, категорија)"),
+    limit: int = Query(6, ge=1, le=25),
+) -> dict:
+    """Read-only преглед на тоа што чатботот го гледа во базата. За тестирање."""
+    if not db_available():
+        raise HTTPException(status_code=503, detail="Базата не е поврзана.")
+    rows = search_products(q, limit=limit)
+    return {"query": q, "count": len(rows), "products": rows}
 
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
-    """Најди релевантни делови од knowledge base-от и одговори."""
+    """Провери во базата дали го имаме производот, додади знаење и одговори."""
     if not req.messages:
         raise HTTPException(status_code=400, detail="Нема пораки.")
 
@@ -106,6 +152,13 @@ def chat(req: ChatRequest) -> ChatResponse:
         (m.content for m in reversed(req.messages) if m.role == "user"), ""
     )
 
+    # 1) Read-only пребарување во базата на производи.
+    if db_available():
+        products_ctx = format_products(search_products(question, limit=6))
+    else:
+        products_ctx = "Базата не е поврзана (нема DATABASE_URL)."
+
+    # 2) Релевантно земјоделско знаење од knowledgeBase.txt.
     context = format_docs(retriever.invoke(question))
 
     prompt = ChatPromptTemplate.from_template(
@@ -113,5 +166,7 @@ def chat(req: ChatRequest) -> ChatResponse:
     )
     chain = prompt | model | StrOutputParser()
 
-    reply = chain.invoke({"context": context, "question": question})
+    reply = chain.invoke(
+        {"products": products_ctx, "context": context, "question": question}
+    )
     return ChatResponse(reply=reply)
