@@ -44,9 +44,26 @@ text_splitter = CharacterTextSplitter(
 )
 chunks = text_splitter.split_documents(documents)
 
-# TODO treba da se kesira chroma db , da ne se kreira sekoj pat odnovo
-# TODO treba da se smene embeding modelot da ne go plakjam via model, sakam besplaten. Ama eve ne najdov besplaten i vika deka nema prakticno.
-vector_db = Chroma.from_documents(chunks, OpenAIEmbeddings())
+# Кеширање: ако веќе има зачувана Chroma база на диске, ја вчитуваме директно
+# и НЕ праќаме документи до OpenAI одново (штедиме пари). Се пресметува само
+# ембедингот на новото прашање од корисникот.
+CHROMA_PERSIST_DIR = "./chroma_db"
+embedding = OpenAIEmbeddings()
+
+if os.path.isdir(CHROMA_PERSIST_DIR) and os.listdir(CHROMA_PERSIST_DIR):
+    vector_db = Chroma(
+        persist_directory=CHROMA_PERSIST_DIR,
+        embedding_function=embedding,
+    )
+    print(f"[rag] вчитана постоечка Chroma база од {CHROMA_PERSIST_DIR} (без нови ембединги)")
+else:
+    vector_db = Chroma.from_documents(
+        chunks,
+        embedding=embedding,
+        persist_directory=CHROMA_PERSIST_DIR,
+    )
+    print(f"[rag] изработена нова Chroma база и зачувана во {CHROMA_PERSIST_DIR}")
+
 retriever = vector_db.as_retriever(search_kwargs={"k": 2})
 
 # model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)

@@ -11,3 +11,6 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Chroma векторска база (кеширани ембединги — не во git)
+chroma_db/
