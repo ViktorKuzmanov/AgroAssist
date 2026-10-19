@@ -127,8 +127,6 @@ _CYR_TO_LAT = {
     "ч": "ch", "џ": "dzh", "ш": "sh",
 }
 
-# TODO : Switch model first oti moze i nema da mi treba vaa translation so nov model primer gemini
-# nz realno dali mi trebat site via cyrillic  translations , da gi remove ako ne i da vidam dali mozam bez niv
 def _latin_to_cyrillic(text: str) -> str:
     out = []
     i = 0
@@ -240,7 +238,7 @@ def search_products(term: str, limit: int = 6) -> list[dict]:
     groups: list[str] = []
     flat_clauses: list[str] = []
     params: list = []
-    # TODO da se prebaruva spored descirption kolonata dopolnitelno?
+    
     for token in tokens:
         ors = []
         for v in _variants(token):

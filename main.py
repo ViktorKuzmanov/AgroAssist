@@ -45,7 +45,7 @@ text_splitter = CharacterTextSplitter(
 chunks = text_splitter.split_documents(documents)
 
 # TODO treba da se kesira chroma db , da ne se kreira sekoj pat odnovo
-# TODO treba da se smene embeding modelot da ne go plakjam via model, sakam besplaten
+# TODO treba da se smene embeding modelot da ne go plakjam via model, sakam besplaten. Ama eve ne najdov besplaten i vika deka nema prakticno.
 vector_db = Chroma.from_documents(chunks, OpenAIEmbeddings())
 retriever = vector_db.as_retriever(search_kwargs={"k": 2})
 
