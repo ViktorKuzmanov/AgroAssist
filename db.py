@@ -272,6 +272,7 @@ def format_products(rows: list[dict]) -> str:
     if not rows:
         return "NONE (нема пронајден производ во базата)"
     labels = [
+        ("description", "description"),
         ("category", "category"),
         ("active_substance", "active substance"),
         ("price", "price"),
