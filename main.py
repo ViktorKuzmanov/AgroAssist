@@ -55,8 +55,10 @@ model = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
 # Add prompt template
 TEMPLATES = {
     "mk": (
-        "Ти си AI асистент на Викторија Кристал, земјоделска аптека. "
-        "Одговарај кратко, јасно и на македонски јазик.\n\n"
+        "Ти си AI асистент на Викторија Кристал, земјоделска аптека.\n\n"
+        "ЈАЗИК: Одговарај на истиот јазик на кој е поставено прашањето — на "
+        "македонски ако прашањето е на македонски, а на англиски ако прашањето е "
+        "на англиски. Одговарај кратко и јасно.\n\n"
         "ПРОИЗВОДИ НАЈДЕНИ ВО НАШАТА БАЗА (овие производи ПОСТОЈАТ и се достапни):\n"
         "{products}\n\n"
         "ЗЕМЈОДЕЛСКО ЗНАЕЊЕ:\n{context}\n\n"
@@ -73,8 +75,10 @@ TEMPLATES = {
         "производот и искористи го земјоделското знаење за да помогнеш."
     ),
     "en": (
-        "You are the AI assistant of Viktoria Kristal, an agricultural pharmacy. "
-        "Answer briefly, clearly, and in English.\n\n"
+        "You are the AI assistant of Viktoria Kristal, an agricultural pharmacy.\n\n"
+        "LANGUAGE: Answer in the same language as the question — English if the "
+        "question is in English, Macedonian if the question is in Macedonian. "
+        "Answer briefly and clearly.\n\n"
         "PRODUCTS FOUND IN OUR DATABASE (these products EXIST and are available):\n"
         "{products}\n\n"
         "AGRICULTURAL KNOWLEDGE:\n{context}\n\n"
