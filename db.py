@@ -230,10 +230,11 @@ def search_products(term: str, limit: int = 6) -> list[dict]:
         return []
 
     # Го печатам она што оди во пребарувањето, за да се види како се бара.
-    keywords = [v for token in tokens for v in _variants(token)]
     print(f"[db] прашање: {term!r}")
     print(f"[db]   извлечени зборови: {tokens}  (стоп-зборовите се отфрлени)")
-    print(f"[db]   LIKE клучни зборови: {keywords}")
+    print("[db]   транслитерација по збор (оригинал → сите форми):")
+    for token in tokens:
+        print(f"[db]     {token!r} → {_variants(token)}")
     print("[db]   се бараат во: name, category, description, active_substance")
 
     groups: list[str] = []
