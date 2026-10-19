@@ -167,6 +167,13 @@ def chat(req: ChatRequest) -> ChatResponse:
     )
     chain = prompt | model | StrOutputParser()
 
+    # Го печатам целиот промпт што оди кон моделот, за да се види во терминалот.
+    print("\n" + "=" * 78)
+    print(f"ПРОМПТ КОН {GEMINI_MODEL} ({req.lang})")
+    print("=" * 78)
+    print(prompt.format(products=products_ctx, context=context, question=question))
+    print("=" * 78 + "\n", flush=True)
+
     reply = chain.invoke(
         {"products": products_ctx, "context": context, "question": question}
     )
