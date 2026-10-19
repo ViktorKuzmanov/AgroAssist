@@ -20,12 +20,10 @@ load_dotenv()
 
 DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 
-# TODO : wtf tuka ima koloni so ne postoat u bazata
 # Сите колони што ги читаме (не ги измислувај — ова се вистинските во "Product").
 PRODUCT_COLUMNS = (
     "id, name, description, price, category, unit, active_substance, "
-    "is_active, deadline, stock, default_dosage, manufacturer, formulation, "
-    "frac_group, karenca_days, priority_weight, is_preferred, registration_note_mk"
+    "is_active, deadline, stock, default_dosage"
 )
 
 # Производите со is_active = false се „избришани" (меко бришење). NULL = активен.
@@ -213,14 +211,14 @@ def _run_search(where_clause: str, params: list, limit: int) -> list[dict]:
     sql = (
         f"SELECT {PRODUCT_COLUMNS} FROM \"Product\" "
         f"WHERE {ACTIVE_FILTER} AND ({where_clause}) "
-        "ORDER BY is_preferred DESC NULLS LAST, priority_weight DESC NULLS LAST, name "
+        "ORDER BY name "
         "LIMIT %s"
     )
     return _fetch(sql, [*params, limit])
 
 
 def search_products(term: str, limit: int = 6) -> list[dict]:
-    """Барај активни производи по име, активна супстанца, категорија, производител или опис.
+    """Барај активни производи по име, активна супстанца, категорија или опис.
 
     Прво бара производи каде што се совпаѓаат СИТЕ зборови (поточно), а ако
     нема резултат — било кој збор (пошироко). Секој збор се проверува и во
@@ -236,24 +234,24 @@ def search_products(term: str, limit: int = 6) -> list[dict]:
     print(f"[db] прашање: {term!r}")
     print(f"[db]   извлечени зборови: {tokens}  (стоп-зборовите се отфрлени)")
     print(f"[db]   LIKE клучни зборови: {keywords}")
-    print("[db]   се бараат во: name, active_substance, category, manufacturer, description")
+    print("[db]   се бараат во: name, category, description, active_substance")
 
     groups: list[str] = []
     flat_clauses: list[str] = []
     params: list = []
-
+    # TODO da se prebaruva spored descirption kolonata dopolnitelno?
     for token in tokens:
         ors = []
         for v in _variants(token):
             like = f"%{v}%"
             clause = (
-                "(name ILIKE %s OR coalesce(active_substance, '') ILIKE %s "
-                "OR coalesce(category, '') ILIKE %s OR coalesce(manufacturer, '') ILIKE %s "
-                "OR coalesce(description, '') ILIKE %s)"
+                "(name ILIKE %s OR coalesce(category, '') ILIKE %s "
+                "OR coalesce(description, '') ILIKE %s "
+                "OR coalesce(active_substance, '') ILIKE %s)"
             )
             ors.append(clause)
             flat_clauses.append(clause)
-            params.extend([like] * 5)
+            params.extend([like] * 4)
         groups.append("(" + " OR ".join(ors) + ")")
 
     # 1) Сите зборови мора да се совпаднат (најточно).
@@ -273,20 +271,14 @@ def format_products(rows: list[dict]) -> str:
     """Претвори ги редовите во читлив текст за LLM-от."""
     if not rows:
         return "NONE (нема пронајден производ во базата)"
-    # TODO: Tuka ima labels so ne postoat, izbrishi gi
     labels = [
         ("category", "category"),
         ("active_substance", "active substance"),
-        ("manufacturer", "manufacturer"),
-        ("formulation", "formulation"),
         ("price", "price"),
         ("unit", "unit"),
         ("stock", "stock"),
         ("deadline", "deadline"),
         ("default_dosage", "default dosage"),
-        ("karenca_days", "karenca (days)"),
-        ("frac_group", "FRAC group"),
-        ("registration_note_mk", "registration note"),
     ]
 
     lines = []
