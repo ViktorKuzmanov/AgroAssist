@@ -174,8 +174,8 @@ def _variants(token: str) -> list[str]:
     return out
 
 
-# --- Токенизација -------------------------------------------------------------
-
+# --- Токенизација ------------------------------------------------------------- 
+# Stopwords se so cel da ne prebaruva products spored via zborovi
 _STOPWORDS = {
     # македонски
     "и", "или", "за", "на", "во", "со", "да", "ли", "е", "се", "не", "што",
@@ -228,7 +228,15 @@ def search_products(term: str, limit: int = 6) -> list[dict]:
     """
     tokens = _tokens(term)
     if not tokens:
+        print(f"[db] прашање: {term!r} → нема клучни зборови (сите се стоп-зборови)")
         return []
+
+    # Го печатам она што оди во пребарувањето, за да се види како се бара.
+    keywords = [v for token in tokens for v in _variants(token)]
+    print(f"[db] прашање: {term!r}")
+    print(f"[db]   извлечени зборови: {tokens}  (стоп-зборовите се отфрлени)")
+    print(f"[db]   LIKE клучни зборови: {keywords}")
+    print("[db]   се бараат во: name, active_substance, category, manufacturer, description")
 
     groups: list[str] = []
     flat_clauses: list[str] = []
@@ -250,12 +258,14 @@ def search_products(term: str, limit: int = 6) -> list[dict]:
 
     # 1) Сите зборови мора да се совпаднат (најточно).
     rows = _run_search(" AND ".join(groups), params, limit)
+    print(f"[db]   AND (сите зборови) → {len(rows)} производи")
     if rows:
         return rows
 
     # 2) Отстапка: било кој збор да се совпадне (пошироко).
     if len(tokens) > 1:
-        return _run_search(" OR ".join(flat_clauses), params, limit)
+        rows = _run_search(" OR ".join(flat_clauses), params, limit)
+        print(f"[db]   OR (било кој збор) → {len(rows)} производи")
     return rows
 
 
