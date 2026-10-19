@@ -52,6 +52,8 @@ retriever = vector_db.as_retriever(search_kwargs={"k": 2})
 # model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
 model = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
 
+# TODO voa da gi vrakja site proizvodi nema da bide valjda zasekogas oti ne e praktino
+#  ja kje imam 50 proizvodi za pepelnica ako prasa userot primer i nema site da gi gleda on
 # Add prompt template
 TEMPLATES = {
     "mk": (
