@@ -28,7 +28,8 @@ from db import db_available, format_products, search_products
 load_dotenv()
 
 # OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+# TODO moze Fallback во код da stavam: ако 3.8-flash hitne rate limit i фрли 429, автоматски ретрај со flash-lite 
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 
 # --- RAG: вчитај knowledge base и направи векторска база ---------------------
