@@ -47,12 +47,12 @@ chunks = text_splitter.split_documents(documents)
 # TODO treba da se kesira chroma db , da ne se kreira sekoj pat odnovo
 # TODO treba da se smene embeding modelot da ne go plakjam via model, sakam besplaten
 vector_db = Chroma.from_documents(chunks, OpenAIEmbeddings())
-retriever = vector_db.as_retriever(search_kwargs={"k": 4})
+retriever = vector_db.as_retriever(search_kwargs={"k": 2})
 
 # model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
 model = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
 
-# Add system prompt
+# Add prompt template
 TEMPLATES = {
     "mk": (
         "Ти си AI асистент на Викторија Кристал, земјоделска аптека. "
