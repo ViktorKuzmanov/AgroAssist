@@ -3,7 +3,7 @@ AgroAssist — FastAPI бекенд со RAG + read-only пристап до б�
 
 За секое прашање:
 1. Пребарува во базата ("Product") дали го имаме производот (read-only).
-2. Го вчитува релевантното земјоделско знаење од knowledgeBase.txt (RAG).
+2. Го вчитува релевантното земјоделско знаење од agro_knowledge_base.txt (RAG).
 3. Ги спојува двете во еден одговор.
 """
 
@@ -34,13 +34,18 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 
 # --- RAG: вчитај knowledge base и направи векторска база ---------------------
 
-loader = TextLoader("./knowledgeBase.txt", encoding="utf-8")
+loader = TextLoader("./agro_knowledge_base.txt", encoding="utf-8")
 documents = loader.load()
 
+# Секој нумериран запис (култура/болест/штетник) е еден ред, па separator="\n"
+# држи една цела ставка во еден фрагмент.
+# TODO: nz dali  da namalam chunk_size pomalo da bide oti mnogu info prakja a nemam tolku info jas. 
+# Primer za spanjakj ako prasa iam samo 500 chunk size mi treba a 1500 chunk size opfakja i drugite kulturi pod spanakjot 
+# ama ne e strasno i 1500 da ostane, toa sepak zavisi i od bazata moze kje iam povekje u idnina
 text_splitter = CharacterTextSplitter(
-    separator="\n\n",
-    chunk_size=1200,
-    chunk_overlap=200,
+    separator="\n",
+    chunk_size=1500,
+    chunk_overlap=100,
 )
 chunks = text_splitter.split_documents(documents)
 
@@ -64,7 +69,7 @@ else:
     )
     print(f"[rag] изработена нова Chroma база и зачувана во {CHROMA_PERSIST_DIR}")
 
-retriever = vector_db.as_retriever(search_kwargs={"k": 2})
+retriever = vector_db.as_retriever(search_kwargs={"k": 4})
 
 # model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
 model = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
@@ -187,7 +192,7 @@ def chat(req: ChatRequest) -> ChatResponse:
     else:
         products_ctx = "Базата не е поврзана (нема DATABASE_URL)."
 
-    # 2) Релевантно земјоделско знаење од knowledgeBase.txt.
+    # 2) Релевантно земјоделско знаење од agro_knowledge_base.txt.
     context = format_docs(retriever.invoke(question))
 
     prompt = ChatPromptTemplate.from_template(
