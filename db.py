@@ -158,6 +158,7 @@ def _variants(token: str) -> list[str]:
     „herbicidi“ -> „herbicid“.
     """
     bases = [token]
+    # ако е ≥5 знаци и завршува со самогласка, се брише последниот знак, za mnozina хербициди“ -> „хербицид
     if len(token) >= 5 and token[-1].lower() in _TRAILING:
         bases.append(token[:-1])
 
@@ -193,6 +194,7 @@ def _tokens(term: str) -> list[str]:
     words = _WORD_RE.findall(term.lower())
     out = []
     for w in words:
+        # ги брише зборовите со помалку од 2 знаци и стоп-зборовите („и", „за", „цена", „the"…).
         if len(w) < 2:
             continue
         # Стоп-зборот се проверува и во латинична и во кирилична форма,
