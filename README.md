@@ -1,5 +1,7 @@
 # AgroAssist - Agricultural Recommendation Engine
 
+Krajnata verzija na agroAssist kje se primenue u aptekata i kje funkcnira besprekorno. Kje mu kazis ti za koa kultura, koja bolest i on ti dava 'structured' output so znaci tocnite proizvodi so treba da mu gi dadis na kupuvacot. Voa e chatbot ama ja moze da go dopravam za uste pobrzo koristenje da bide samo so kopcinja da se prave prompt samo da selektiras ti za da mu dadis prompt za da bide pobrzo
+
 AI-powered agricultural decision-support application for an agricultural pharmacy.
 
 The system helps pharmacy employees make more informed, consistent, and situation-specific product recommendations by combining the pharmacy's product database, agricultural knowledge from an experienced agricultural engineer, customer/crop information, treatment history, and—when appropriate—information from external sources.
