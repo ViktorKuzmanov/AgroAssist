@@ -63,6 +63,8 @@ Endpoint-и:
 
 ## Deploy (Render — бесплатно)
 
+**Жив сервис: https://agroassist-vxfe.onrender.com**
+
 `render.yaml` го опишува сервисот, па деплојот е еден клик.
 
 1. **render.com → New → Blueprint** → избери го репозиторијумот `ViktorKuzmanov/AgroAssist`.
@@ -70,21 +72,28 @@ Endpoint-и:
    Start `uvicorn main:app --host 0.0.0.0 --port $PORT`.)
 2. Внеси ги env променливите (во Blueprint-от се бараат како `sync: false`):
    - `GEMINI_API_KEY` — https://aistudio.google.com/apikey (чат модел, бесплатен free tier)
-   - `OPENAI_API_KEY` — само за embeddings (векторската база е верзионирана, па ретко се користи)
+   - `OPENAI_API_KEY` — потребен и при стартување (не само за embeddings): `OpenAIEmbeddings()`
+     се создава при import, па без клуч сервисот не се буди
    - `DATABASE_URL` — PostgreSQL/Neon (read-only, база со производи)
    - `GEMINI_MODEL` — `gemini-3.1-flash-lite`
-   - `ALLOWED_ORIGINS` — `*` за почеток; откако сајтот ќе биде жив, стави ја неговата адреса
-   (на пример `https://viktoriakristal.vercel.app`) и Render автоматски ќе редеплоира.
-3. Сајтот го повикува овој сервис преку `VITE_ASSISTANT_URL` — env променлива на страната на
-   сајтот, која мора да биде поставена **при build** (Vercel: Project → Settings → Environment
+   - `ALLOWED_ORIGINS` — `*` за почеток; откако сајтот ќе биде жив, стави ги неговите адреси
+   (на пример `https://viktoria-kristal.vercel.app,https://viktoriakristal.lovable.app`) и
+   Render автоматски ќе редеплоира.
+3. Сајтот го повикува овој сервис преку `VITE_ASSISTANT_URL` — таа вредност е запишана во
+   `.env` на сајтот (`ViktoriaKristal-Website`), па бидејќи `VITE_*` се читаат **при build**,
+   таа мора да биде поставена пред build-от (Vercel: Project → Settings → Environment
    Variables → Production + Preview).
 
 Проверка:
 
 ```bash
-curl https://<service>.onrender.com/health
+curl https://agroassist-vxfe.onrender.com/health
 # {"status":"ok","model":"gemini-3.1-flash-lite","database":true}
 ```
+
+> ℹ️ Верзиите во `requirements.txt` се **пинирани** (chromadb 1.5.9, langchain 1.4.6 …) за да ја
+> совпаѓаат шемата на верзионираната `chroma_db/`. Не ги отпуштај (`>=`) без да ја ребилдираш
+> базата.
 
 > ⚠️ Бесплатниот план **спие** по 15 минути неактивност — првата порака потоа чека 30–60 секунди
 > додека сервисот се буди. Решение: бесплатен пингер (cron-job.org или UptimeRobot) на
@@ -98,6 +107,14 @@ curl https://<service>.onrender.com/health
 >
 > ```bash
 > git checkout -- chroma_db/
+> ```
+>
+> Почесто решение — скриј ги промените од Git, а верзионираните фајлови остануваат во репото
+> (важи и за Render, кој ја clone-а базата при build):
+>
+> ```bash
+> git update-index --skip-worktree chroma_db/
+> # откажи:  git update-index --no-skip-worktree chroma_db/
 > ```
 
 
