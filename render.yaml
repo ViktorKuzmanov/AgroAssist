@@ -12,14 +12,21 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
-      # Chat model (Google Gemini free tier) — https://aistudio.google.com/apikey
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: GEMINI_MODEL
-        value: gemini-3.1-flash-lite
-      # Embeddings only (the Chroma db is committed, so this is rarely used)
+      # Чат модел (OpenAI / ChatGPT) — https://platform.openai.com/api-keys
+      - key: OPENAI_MODEL
+        value: gpt-5.4-mini
+      # Резервен модел — само ако главниот падне (429 / 5xx / timeout)
+      - key: OPENAI_FALLBACK_MODEL
+        value: gpt-4o-mini
+      # Клуч за OpenAI — користи се и за чат моделот и за embeddings
+      # (the Chroma db is committed, so embeddings are rarely needed)
       - key: OPENAI_API_KEY
         sync: false
+      # Gemini (бесплатен) — раскоментирај ако го вратиш како главен/резервен модел
+      # - key: GEMINI_API_KEY
+      #   sync: false
+      # - key: GEMINI_MODEL
+      #   value: gemini-3.1-flash-lite
       # Read-only PostgreSQL (Neon) with the product database
       - key: DATABASE_URL
         sync: false

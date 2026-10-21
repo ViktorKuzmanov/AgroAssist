@@ -7,8 +7,10 @@ uvicorn[standard]==0.54.0
 openai==3.31.0
 python-dotenv==1.2.4
 
-# Чат модел (бесплатен Google Gemini free tier)
-langchain-google-genai==4.4.2
+# Чат модел (OpenAI / ChatGPT) — користи langchain-openai (иста пакет, веќе е тука).
+# Gemini (бесплатен Google free tier) — РАСКОМЕНТИРАЈ оваа линија И импортот
+# во main.py (и env променливите GEMINI_*) ако сакаш да го вратиш Gemini.
+# langchain-google-genai==4.4.2
 
 # RAG (embeddings остануваат на OpenAI)
 langchain==1.4.6

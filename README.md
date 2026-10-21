@@ -73,14 +73,20 @@ Endpoint-и:
    (Или **New → Web Service** со рачните вредности: Build `pip install -r requirements.txt`,
    Start `uvicorn main:app --host 0.0.0.0 --port $PORT`.)
 2. Внеси ги env променливите (во Blueprint-от се бараат како `sync: false`):
-   - `GEMINI_API_KEY` — https://aistudio.google.com/apikey (чат модел, бесплатен free tier)
    - `OPENAI_API_KEY` — потребен и при стартување (не само за embeddings): `OpenAIEmbeddings()`
-     се создава при import, па без клуч сервисот не се буди
+     се создава при import, па без клуч сервисот не се буди. Истиот клуб се користи и за
+     чат моделот → https://platform.openai.com/api-keys
    - `DATABASE_URL` — PostgreSQL/Neon (read-only, база со производи)
-   - `GEMINI_MODEL` — `gemini-3.1-flash-lite`
    - `ALLOWED_ORIGINS` — `*` за почеток; откако сајтот ќе биде жив, стави ги неговите адреси
    (на пример `https://viktoria-kristal.vercel.app,https://viktoriakristal.lovable.app`) и
    Render автоматски ќе редеплоира.
+
+   Во `render.yaml` се веќе зададени (менувај ги таму, не во dashboard-от):
+   - `OPENAI_MODEL` — `gpt-5.4-mini` (главен чат модел)
+   - `OPENAI_FALLBACK_MODEL` — `gpt-4o-mini` (се користи САМО ако главниот падне со 429/5xx/timeout)
+
+   > Gemini (бесплатен) е закоментиран во `main.py`, `requirements.txt` и `render.yaml`.
+   > Раскоментирај на трите места (плус `GEMINI_API_KEY` во dashboard) кога сакаш да се врати.
 3. Сајтот го повикува овој сервис преку `VITE_ASSISTANT_URL` — таа вредност е запишана во
    `.env` на сајтот (`ViktoriaKristal-Website`), па бидејќи `VITE_*` се читаат **при build**,
    таа мора да биде поставена пред build-от (Vercel: Project → Settings → Environment
@@ -90,7 +96,7 @@ Endpoint-и:
 
 ```bash
 curl https://agroassist-vxfe.onrender.com/health
-# {"status":"ok","model":"gemini-3.1-flash-lite","database":true}
+# {"status":"ok","model":"gpt-5.4-mini","fallback_model":"gpt-4o-mini","database":true}
 ```
 
 > ℹ️ Верзиите во `requirements.txt` се **пинирани** (chromadb 1.5.9, langchain 1.4.6 …) за да ја

@@ -13,23 +13,38 @@ from typing import Literal
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from openai import APIConnectionError, APIStatusError, APITimeoutError, BadRequestError
 from pydantic import BaseModel
 
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import TextLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import OpenAIEmbeddings
+
+# Gemini (бесплатен Google free tier) — РАСКОМЕНТИРАЈ оваа линија И соодветните
+# редови подолу (модел + requirements.txt) ако сакаш да се врати Gemini како
+# главен или резервен чат модел. Ниту една линија не е избришана.
+# from langchain_google_genai import ChatGoogleGenerativeAI
+
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import CharacterTextSplitter
 
 from db import db_available, format_products, search_products
 
 load_dotenv()
 
-# OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-# TODO moze Fallback во код da stavam: ако 3.8-flash hitne rate limit i фрли 429, автоматски ретрај со flash-lite 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+# --- Чат модел (OpenAI / ChatGPT) --------------------------------------------
+
+# Главен модел. gpt-5.4-mini е брз, евтин и прифаќа temperature=0 (детерминистички
+# одговор — важно за правилото „наведи ги СИТЕ производи“).
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+
+# Резервен модел — користи се САМО ако главниот падне (429 / 5xx / timeout).
+OPENAI_FALLBACK_MODEL = os.getenv("OPENAI_FALLBACK_MODEL", "gpt-4o-mini")
+
+# Gemini — закоментиран засега (бесплатен, врати го кога сакаш да го полниш).
+# GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 
 # --- RAG: вчитај knowledge base и направи векторска база ---------------------
@@ -71,8 +86,33 @@ else:
 
 retriever = vector_db.as_retriever(search_kwargs={"k": 4})
 
-# model = ChatOpenAI(model=OPENAI_MODEL, temperature=0)
-model = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
+# --- Конструкција на чат моделите --------------------------------------------
+
+# Некои модели од OpenAI (gpt-5, gpt-5-mini/nano/pro, сите gpt-6-*) одбиваат
+# temperature != 1 со HTTP 400 ("Unsupported value: 'temperature'"). За нив
+# temperature воопшто не се праќа. gpt-4o*, gpt-4.1*, gpt-5.2 и gpt-5.4* го
+# прифаќаат temperature=0.
+def _model_rejects_temperature(name: str) -> bool:
+    return name == "gpt-5" or name.startswith("gpt-5-") or name.startswith("gpt-6")
+
+
+def _chat_openai(name: str, temperature: bool = True) -> ChatOpenAI:
+    """ChatOpenAI со автоматски избор дали смее да се прати temperature."""
+    if not temperature or _model_rejects_temperature(name):
+        return ChatOpenAI(model=name)
+    # LangChain-овиот validator го чисти temperature за СИТЕ модели со "gpt-5" во
+    # името, но суровиот API го прифаќа за gpt-5.2 и gpt-5.4 — затоа го ставаме
+    # temperature ПО конструкцијата, кога validator-от веќе е поминал.
+    m = ChatOpenAI(model=name)
+    m.temperature = 0
+    return m
+
+
+model = _chat_openai(OPENAI_MODEL)
+fallback_model = _chat_openai(OPENAI_FALLBACK_MODEL)
+
+# Gemini (бесплатен) — закоментиран. Раскоментирај со import-от најгоре.
+# model = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
 
 # TODO voa da gi vrakja site proizvodi nema da bide valjda zasekogas oti ne e praktino
 #  ja kje imam 50 proizvodi za pepelnica ako prasa userot primer i nema site da gi gleda on
@@ -130,6 +170,27 @@ def format_docs(docs):
     return "\n\n".join(d.page_content for d in docs)
 
 
+def _invoke_fallback(prompt, payload, primary_error):
+    """Ако главниот модел падне (429 / 5xx / timeout) — одговара резервниот модел.
+
+    Го користи OPENAI_FALLBACK_MODEL (по дифолт gpt-4o-mini). Ако и тој падне,
+    клиентот добива 502 со читлив текст наместо 500 од непозната грешка.
+    """
+    print(
+        f"[fallback] {OPENAI_MODEL} падна ({type(primary_error).__name__}) "
+        f"→ пробувам {OPENAI_FALLBACK_MODEL}",
+        flush=True,
+    )
+    try:
+        chain = prompt | fallback_model | StrOutputParser()
+        return chain.invoke(payload)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Двата модела паднаа ({OPENAI_MODEL}, {OPENAI_FALLBACK_MODEL}): {exc}",
+        ) from exc
+
+
 # --- Модели -----------------------------------------------------------------
 
 class Message(BaseModel):
@@ -161,7 +222,12 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict:
     """Едноставна проверка дека серверот работи."""
-    return {"status": "ok", "model": GEMINI_MODEL, "database": db_available()}
+    return {
+        "status": "ok",
+        "model": OPENAI_MODEL,
+        "fallback_model": OPENAI_FALLBACK_MODEL,
+        "database": db_available(),
+    }
 
 # TODO: Ne se koriste nigde vaa func moze da se isbrise pokasno samo za testiranje e 
 @app.get("/products/search")
@@ -202,14 +268,32 @@ def chat(req: ChatRequest) -> ChatResponse:
 
     # Го печатам целиот промпт што оди кон моделот, за да се види во терминалот.
     print("\n" + "=" * 78)
-    print(f"ПРОМПТ КОН {GEMINI_MODEL} ({req.lang})")
+    print(f"ПРОМПТ КОН {OPENAI_MODEL} ({req.lang})")
     print("=" * 78)
     print(prompt.format(products=products_ctx, context=context, question=question))
     print("=" * 78 + "\n", flush=True)
 
-    reply = chain.invoke(
-        {"products": products_ctx, "context": context, "question": question}
-    )
+    payload = {"products": products_ctx, "context": context, "question": question}
+
+    # TODO Ne go razbiram bas via del razgledaj go i razberi go
+    try:
+        reply = chain.invoke(payload)
+    except BadRequestError as exc:
+        # 400 што не е за temperature = вистинска грешка во барањето → не ретрајаме.
+        if "temperature" not in str(exc).lower():
+            raise HTTPException(status_code=502, detail=f"OpenAI грешка: {exc}") from exc
+        # Моделот одби temperature — пробуваме уште еднаш, без него.
+        print("[chat] моделот одби temperature — ретрај без него", flush=True)
+        chain = prompt | _chat_openai(OPENAI_MODEL, temperature=False) | StrOutputParser()
+        reply = chain.invoke(payload)
+    except (APITimeoutError, APIConnectionError) as exc:
+        reply = _invoke_fallback(prompt, payload, exc)
+    except APIStatusError as exc:
+        # 429 (rate limit) и 5xx се привремени → резервен модел.
+        if exc.status_code < 429:
+            raise HTTPException(status_code=502, detail=f"OpenAI грешка: {exc}") from exc
+        reply = _invoke_fallback(prompt, payload, exc)
+
     return ChatResponse(reply=reply)
 
 
