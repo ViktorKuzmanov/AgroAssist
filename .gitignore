@@ -12,5 +12,5 @@ venv/
 .idea/
 .vscode/
 
-# Chroma векторска база (кеширани ембединги — не во git)
-chroma_db/
+# Chroma векторската база СЕ верзионира (chroma_db/): на Render секој restart ќе ја
+# градеше одново, што значи платени OpenAI embedding повици и бавно стартување.

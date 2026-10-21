@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: agroassist
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    # main.py has no __main__ block, so uvicorn is started explicitly.
+    # Render injects $PORT and expects the app to listen on 0.0.0.0.
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      # Chat model (Google Gemini free tier) — https://aistudio.google.com/apikey
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-lite
+      # Embeddings only (the Chroma db is committed, so this is rarely used)
+      - key: OPENAI_API_KEY
+        sync: false
+      # Read-only PostgreSQL (Neon) with the product database
+      - key: DATABASE_URL
+        sync: false
+      # CORS — comma separated list of allowed origins (set to the site domain after deploy)
+      - key: ALLOWED_ORIGINS
+        value: "*"

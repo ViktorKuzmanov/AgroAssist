@@ -211,3 +211,10 @@ def chat(req: ChatRequest) -> ChatResponse:
         {"products": products_ctx, "context": context, "question": question}
     )
     return ChatResponse(reply=reply)
+
+
+if __name__ == "__main__":
+    # Локално/на Render: сервисот мора да слуша на 0.0.0.0 и на портата од $PORT.
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

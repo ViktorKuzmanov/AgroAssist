@@ -61,6 +61,39 @@ Endpoint-и:
 - `GET /products/search?q=<барање>` — read-only пребарување во базата на производи (за тестирање).
 
 
+## Deploy (Render — бесплатно)
+
+`render.yaml` го опишува сервисот, па деплојот е еден клик.
+
+1. **render.com → New → Blueprint** → избери го репозиторијумот `ViktorKuzmanov/AgroAssist`.
+   (Или **New → Web Service** со рачните вредности: Build `pip install -r requirements.txt`,
+   Start `uvicorn main:app --host 0.0.0.0 --port $PORT`.)
+2. Внеси ги env променливите (во Blueprint-от се бараат како `sync: false`):
+   - `GEMINI_API_KEY` — https://aistudio.google.com/apikey (чат модел, бесплатен free tier)
+   - `OPENAI_API_KEY` — само за embeddings (векторската база е верзионирана, па ретко се користи)
+   - `DATABASE_URL` — PostgreSQL/Neon (read-only, база со производи)
+   - `GEMINI_MODEL` — `gemini-3.1-flash-lite`
+   - `ALLOWED_ORIGINS` — `*` за почеток; откако сајтот ќе биде жив, стави ја неговата адреса
+   (на пример `https://viktoriakristal.vercel.app`) и Render автоматски ќе редеплоира.
+3. Сајтот го повикува овој сервис преку `VITE_ASSISTANT_URL` — env променлива на страната на
+   сајтот, која мора да биде поставена **при build** (Vercel: Project → Settings → Environment
+   Variables → Production + Preview).
+
+Проверка:
+
+```bash
+curl https://<service>.onrender.com/health
+# {"status":"ok","model":"gemini-3.1-flash-lite","database":true}
+```
+
+> ⚠️ Бесплатниот план **спие** по 15 минути неактивност — првата порака потоа чека 30–60 секунди
+> додека сервисот се буди. Решение: бесплатен пингер (cron-job.org или UptimeRobot) на
+> `https://<service>.onrender.com/health` на 10 минути.
+
+> ℹ️ `chroma_db/` е верзионирана намерно: во спротивно секој restart ја гради векторската база
+> одново, што значи платени OpenAI embedding повици и бавно стартување.
+
+
 ## Поврзување со базата на производи (PostgreSQL/Neon)
 
 Чатботот **само чита** од табелата `"Product"`. Ако во `.env` има `DATABASE_URL`, тој прво проверува дали го имаме производот и му ги дава достапните податоци (цена, категорија, активна супстанца, производител, залиха, рок, препорачана доза, каренца). Ако производот не се најде во базата, се користи постојната RAG логика (agro_knowledge_base.txt).
