@@ -93,6 +93,13 @@ curl https://<service>.onrender.com/health
 > ℹ️ `chroma_db/` е верзионирана намерно: во спротивно секој restart ја гради векторската база
 > одново, што значи платени OpenAI embedding повици и бавно стартување.
 
+> ℹ️ При локално стартување Chroma ја допира `chroma_db/`, па `git status` покажува изменети
+> бинарни фајлови. Отфрли ги пред commit:
+>
+> ```bash
+> git checkout -- chroma_db/
+> ```
+
 
 ## Поврзување со базата на производи (PostgreSQL/Neon)
 
